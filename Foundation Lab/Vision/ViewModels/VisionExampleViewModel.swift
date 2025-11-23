@@ -17,6 +17,7 @@ final class VisionExampleViewModel {
 
     var selectedImage: PlatformImage?
     var selectedImageURL: URL?
+    var selectedImageOrientation: CGImagePropertyOrientation = .up
     var analysisResults: ImageFeatures?
     var isAnalyzing = false
     var errorMessage: String?
@@ -54,6 +55,11 @@ final class VisionExampleViewModel {
 
             selectedImage = image
             selectedImageURL = tempURL
+            #if canImport(UIKit)
+            selectedImageOrientation = CGImagePropertyOrientation(image.imageOrientation)
+            #else
+            selectedImageOrientation = .up
+            #endif
             analysisResults = nil
 
         } catch {
@@ -110,7 +116,8 @@ final class VisionExampleViewModel {
             let results = try await analyzer.analyze(
                 imagePath: preprocessedURL.path(),
                 analysisTypes: analysisTypes,
-                includeConfidence: includeConfidence
+                includeConfidence: includeConfidence,
+                orientation: selectedImageOrientation
             )
 
             // Convert to ImageFeatures

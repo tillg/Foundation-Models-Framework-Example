@@ -148,6 +148,10 @@ struct VisionExampleView: View {
                         includeConfidence: viewModel.includeConfidence
                     )
                     .padding(.horizontal)
+                    .onAppear {
+                        // Auto-show overlay when results appear
+                        showingOverlay = true
+                    }
                 }
             }
             .padding(.vertical)

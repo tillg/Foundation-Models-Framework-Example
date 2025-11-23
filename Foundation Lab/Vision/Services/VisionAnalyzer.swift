@@ -99,7 +99,8 @@ final class VisionAnalyzer: @unchecked Sendable {
     func analyze(
         imagePath: String,
         analysisTypes: [AnalysisType],
-        includeConfidence: Bool = true
+        includeConfidence: Bool = true,
+        orientation: CGImagePropertyOrientation = .up
     ) async throws -> AnalysisResults {
         // Load and validate image - prefer file URL for local paths
         let url: URL
@@ -123,8 +124,8 @@ final class VisionAnalyzer: @unchecked Sendable {
             throw VisionAnalyzerError.noImageData
         }
 
-        // Create request handler
-        let handler = VNImageRequestHandler(ciImage: image, options: [:])
+        // Create request handler with orientation
+        let handler = VNImageRequestHandler(ciImage: image, orientation: orientation, options: [:])
 
         // Build requests array
         var requests: [VNRequest] = []
