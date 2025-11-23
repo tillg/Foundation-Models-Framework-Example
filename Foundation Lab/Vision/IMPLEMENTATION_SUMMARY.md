@@ -50,6 +50,7 @@ Successfully implemented the Image Recognition Tool feature as specified in NEXT
   - ImagePickerView.swift: Photo picker integration
   - AnalysisResultView.swift: Formatted results display
   - ImageOverlayView.swift: Bounding boxes + facial landmark crosses (yellow ⨯)
+  - FullscreenImageView.swift: Fullscreen viewer with zoom/pan gestures
 
 ### 6. Integration ✅
 - **ChatViewModel**: Added VisionTool to available tools
@@ -103,7 +104,8 @@ Foundation Lab/Vision/
 │   └── Components/
 │       ├── ImagePickerView.swift
 │       ├── AnalysisResultView.swift
-│       └── ImageOverlayView.swift
+│       ├── ImageOverlayView.swift
+│       └── FullscreenImageView.swift
 └── [Documentation files]
 ```
 
@@ -164,6 +166,7 @@ Foundation Lab/Vision/
 - Select image from library
 - Choose analysis types
 - View detailed results with overlays
+- Tap image to view fullscreen with zoom/pan gestures
 
 ### Voice Interface (Future)
 - "Analyze this image" voice command
@@ -193,3 +196,4 @@ All phases from NEXT_FEATURE.md have been implemented and tested:
 - ✅ Phase 5: Integration
 - ✅ Phase 6: Build, Compilation & Testing
 - ✅ **Facial Landmarks Visualization** - Yellow crosses at eyes, nose, mouth
+- ✅ **Fullscreen Image Viewer** - Zoom/pan gestures, platform-specific presentation (fullScreenCover on iOS, sheet on macOS)

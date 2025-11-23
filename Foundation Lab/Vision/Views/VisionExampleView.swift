@@ -12,6 +12,7 @@ struct VisionExampleView: View {
     @State private var viewModel = VisionExampleViewModel()
     @State private var selectedItem: PhotosPickerItem?
     @State private var showingOverlay = false
+    @State private var showingFullscreen = false
 
     var body: some View {
         ScrollView {
@@ -37,24 +38,29 @@ struct VisionExampleView: View {
                     // Selected Image Preview
                     VStack(spacing: 12) {
                         if let image = viewModel.selectedImage {
-                            if showingOverlay, let results = viewModel.analysisResults {
-                                ImageOverlayView(image: image, results: results)
-                                    .frame(maxHeight: 300)
-                                    .cornerRadius(12)
-                            } else {
-                                #if canImport(UIKit)
-                                Image(uiImage: image)
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fit)
-                                    .frame(maxHeight: 300)
-                                    .cornerRadius(12)
-                                #elseif canImport(AppKit)
-                                Image(nsImage: image)
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fit)
-                                    .frame(maxHeight: 300)
-                                    .cornerRadius(12)
-                                #endif
+                            Group {
+                                if showingOverlay, let results = viewModel.analysisResults {
+                                    ImageOverlayView(image: image, results: results)
+                                        .frame(maxHeight: 300)
+                                        .cornerRadius(12)
+                                } else {
+                                    #if canImport(UIKit)
+                                    Image(uiImage: image)
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fit)
+                                        .frame(maxHeight: 300)
+                                        .cornerRadius(12)
+                                    #elseif canImport(AppKit)
+                                    Image(nsImage: image)
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fit)
+                                        .frame(maxHeight: 300)
+                                        .cornerRadius(12)
+                                    #endif
+                                }
+                            }
+                            .onTapGesture {
+                                showingFullscreen = true
                             }
                         }
 
@@ -157,6 +163,20 @@ struct VisionExampleView: View {
             .padding(.vertical)
         }
         .navigationTitle("Image Analysis")
+        #if os(iOS)
+        .fullScreenCover(isPresented: $showingFullscreen) {
+            if let image = viewModel.selectedImage, let results = viewModel.analysisResults {
+                FullscreenImageView(image: image, results: results, showOverlay: showingOverlay)
+            }
+        }
+        #elseif os(macOS)
+        .sheet(isPresented: $showingFullscreen) {
+            if let image = viewModel.selectedImage, let results = viewModel.analysisResults {
+                FullscreenImageView(image: image, results: results, showOverlay: showingOverlay)
+                    .frame(minWidth: 800, minHeight: 600)
+            }
+        }
+        #endif
     }
 }
 
