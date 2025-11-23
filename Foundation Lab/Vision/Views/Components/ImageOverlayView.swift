@@ -37,7 +37,7 @@ struct ImageOverlayView: View {
     }
 
     private func drawOverlays(context: GraphicsContext, size: CGSize) {
-        // Draw text bounding boxes
+        // Draw text bounding boxes with priority markers
         for textFeature in results.textFeatures {
             drawBoundingBox(
                 context: context,
@@ -45,6 +45,16 @@ struct ImageOverlayView: View {
                 color: .blue,
                 canvasSize: size
             )
+
+            // Draw priority badge if available
+            if let priority = textFeature.priority {
+                drawPriorityBadge(
+                    context: context,
+                    normalizedBox: textFeature.boundingBox,
+                    priority: priority,
+                    canvasSize: size
+                )
+            }
         }
 
         // Draw face bounding boxes and landmarks
@@ -209,6 +219,46 @@ struct ImageOverlayView: View {
             with: .color(.yellow),
             lineWidth: lineWidth
         )
+    }
+
+    private func drawPriorityBadge(
+        context: GraphicsContext,
+        normalizedBox: CGRect,
+        priority: Int,
+        canvasSize: CGSize
+    ) {
+        // Convert normalized coordinates to canvas coordinates
+        let x = normalizedBox.origin.x * canvasSize.width
+        let width = normalizedBox.width * canvasSize.width
+        let height = normalizedBox.height * canvasSize.height
+        let y = canvasSize.height - (normalizedBox.origin.y + normalizedBox.height) * canvasSize.height
+
+        // Badge color based on priority (matching UI display)
+        let badgeColor: Color = {
+            switch priority {
+            case 1: return .red
+            case 2: return .orange
+            case 3: return .blue
+            default: return .gray
+            }
+        }()
+
+        // Position badge at top-right corner of bounding box
+        let badgeSize: CGFloat = min(24, height * 0.4) // Adaptive size, but not too large
+        let badgeX = x + width - badgeSize - 4
+        let badgeY = y + 4
+
+        // Draw badge background (rounded rectangle)
+        let badgeRect = CGRect(x: badgeX, y: badgeY, width: badgeSize, height: badgeSize * 0.8)
+        let badgePath = Path(roundedRect: badgeRect, cornerRadius: 4)
+        context.fill(badgePath, with: .color(badgeColor))
+
+        // Draw text
+        let text = Text("P\(priority)")
+            .font(.system(size: badgeSize * 0.5, weight: .semibold))
+            .foregroundColor(.white)
+
+        context.draw(text, at: CGPoint(x: badgeX + badgeSize / 2, y: badgeY + badgeSize * 0.4))
     }
 
 }

@@ -28,6 +28,7 @@ final class VisionExampleViewModel {
 
     private let analyzer = VisionAnalyzer()
     private let preprocessor = ImagePreprocessor()
+    private let fontSizeAnalyzer = FontSizeAnalyzer()
 
     // MARK: - Image Selection
 
@@ -120,8 +121,9 @@ final class VisionExampleViewModel {
                 orientation: selectedImageOrientation
             )
 
-            // Convert to ImageFeatures
-            analysisResults = convertToImageFeatures(results)
+            // Convert to ImageFeatures with importance scoring
+            let imageSize = selectedImage?.size ?? CGSize(width: 1, height: 1)
+            analysisResults = convertToImageFeatures(results, imageSize: imageSize)
 
             // Clean up temp file ONLY if it's different from the original
             // (preprocessor created a resized version)
@@ -138,16 +140,39 @@ final class VisionExampleViewModel {
 
     // MARK: - Helper Methods
 
-    private func convertToImageFeatures(_ results: VisionAnalyzer.AnalysisResults) -> ImageFeatures {
+    private func convertToImageFeatures(_ results: VisionAnalyzer.AnalysisResults, imageSize: CGSize) -> ImageFeatures {
         var features = ImageFeatures()
 
-        // Convert text results
-        features.textFeatures = results.textResults.map { result in
+        // Convert text results with importance scoring
+        let basicTextFeatures = results.textResults.map { result in
             TextFeature(
                 text: result.text,
                 confidence: result.confidence,
-                boundingBox: result.boundingBox
+                boundingBox: result.boundingBox,
+                priority: nil,
+                estimatedPointSize: nil,
+                heightInPixels: nil
             )
+        }
+
+        // Analyze text importance
+        if !basicTextFeatures.isEmpty {
+            let importanceResults = fontSizeAnalyzer.analyzeImportance(
+                textFeatures: basicTextFeatures,
+                imageSize: imageSize
+            )
+
+            // Map importance data back to text features
+            features.textFeatures = importanceResults.map { importance in
+                TextFeature(
+                    text: importance.text,
+                    confidence: importance.confidence,
+                    boundingBox: importance.boundingBox,
+                    priority: importance.priority,
+                    estimatedPointSize: importance.estimatedPointSize,
+                    heightInPixels: importance.heightInPixels
+                )
+            }
         }
 
         // Convert face results

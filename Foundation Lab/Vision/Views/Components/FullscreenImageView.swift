@@ -50,7 +50,8 @@ struct FullscreenImageView: View {
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 30))
-                            .foregroundStyle(.white.opacity(0.7))
+                            .foregroundStyle(.white)
+                            .shadow(color: .black.opacity(0.5), radius: 4, x: 0, y: 2)
                             .padding()
                     }
                 }

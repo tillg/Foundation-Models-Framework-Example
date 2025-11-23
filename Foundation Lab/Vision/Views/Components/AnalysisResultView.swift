@@ -156,17 +156,46 @@ struct TextResultRow: View {
     let showConfidence: Bool
 
     var body: some View {
-        HStack {
-            Text("\"\(feature.text)\"")
-                .font(.body)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text("\"\(feature.text)\"")
+                    .font(.body)
 
-            Spacer()
+                Spacer()
 
-            if showConfidence {
-                Text("\(feature.confidencePercent)%")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                if let priority = feature.priority {
+                    Text("P\(priority)")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(priorityColor(for: priority))
+                        .cornerRadius(8)
+                }
             }
+
+            HStack(spacing: 12) {
+                if let pointSize = feature.estimatedPointSize {
+                    Text("~\(Int(pointSize))pt")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                if showConfidence {
+                    Text("\(feature.confidencePercent)% confidence")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    private func priorityColor(for priority: Int) -> Color {
+        switch priority {
+        case 1: return .red
+        case 2: return .orange
+        case 3: return .blue
+        default: return .gray
         }
     }
 }

@@ -24,6 +24,11 @@ struct TextFeature: Identifiable {
     let confidence: Float
     let boundingBox: CGRect
 
+    // Importance scoring properties
+    var priority: Int?
+    var estimatedPointSize: CGFloat?
+    var heightInPixels: CGFloat?
+
     var confidencePercent: Int {
         Int(confidence * 100)
     }

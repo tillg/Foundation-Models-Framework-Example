@@ -60,7 +60,10 @@ struct VisionExampleView: View {
                                 }
                             }
                             .onTapGesture {
-                                showingFullscreen = true
+                                // Only allow fullscreen if analysis has been performed
+                                if viewModel.analysisResults != nil {
+                                    showingFullscreen = true
+                                }
                             }
                         }
 
