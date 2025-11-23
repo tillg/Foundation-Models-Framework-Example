@@ -42,6 +42,7 @@ final class ChatViewModel {
 
     init() {
         self.session = LanguageModelSession(
+            tools: [VisionTool()],
             instructions: Instructions(
                 "You are a helpful, friendly AI assistant. Engage in natural conversation and provide " +
                 "thoughtful, detailed responses."
@@ -102,6 +103,7 @@ final class ChatViewModel {
         sessionCount = 1
         feedbackState.removeAll()
         session = LanguageModelSession(
+            tools: [VisionTool()],
             instructions: Instructions(instructions)
         )
     }
@@ -112,6 +114,7 @@ final class ChatViewModel {
         // Create a new session with updated instructions
         // Note: The transcript is read-only, so we start fresh with new instructions
         session = LanguageModelSession(
+            tools: [VisionTool()],
             instructions: Instructions(instructions)
         )
     }
