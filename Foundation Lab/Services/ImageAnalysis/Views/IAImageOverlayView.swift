@@ -1,5 +1,5 @@
 //
-//  ImageOverlayView.swift
+//  IAImageOverlayView.swift
 //  Foundation Lab
 //
 //  Overlay view for displaying bounding boxes on analyzed images
@@ -7,13 +7,17 @@
 
 import SwiftUI
 
-struct ImageOverlayView: View {
-    let image: PlatformImage
-    let results: ImageFeatures
+/// SwiftUI view that displays an image with analysis overlays (bounding boxes, priority badges)
+public struct IAImageOverlayView: View {
+    let analyzedImage: AnalyzedImage
 
-    var body: some View {
+    public init(analyzedImage: AnalyzedImage) {
+        self.analyzedImage = analyzedImage
+    }
+
+    public var body: some View {
         #if canImport(UIKit)
-        Image(uiImage: image)
+        Image(uiImage: analyzedImage.originalImage)
             .resizable()
             .aspectRatio(contentMode: .fit)
             .overlay(alignment: .topLeading) {
@@ -23,7 +27,7 @@ struct ImageOverlayView: View {
                 .allowsHitTesting(false)
             }
         #elseif canImport(AppKit)
-        Image(nsImage: image)
+        Image(nsImage: analyzedImage.originalImage)
             .resizable()
             .aspectRatio(contentMode: .fit)
             .overlay(alignment: .topLeading) {
@@ -37,62 +41,38 @@ struct ImageOverlayView: View {
 
     private func drawOverlays(context: GraphicsContext, size: CGSize) {
         // Draw text bounding boxes with priority markers
-        for textFeature in results.textFeatures {
+        for textResult in analyzedImage.textResults {
             drawBoundingBox(
                 context: context,
-                normalizedBox: textFeature.boundingBox,
+                normalizedBox: textResult.boundingBox,
                 color: .blue,
                 canvasSize: size
             )
 
-            // Draw priority badge if available
-            if let priority = textFeature.priority {
-                drawPriorityBadge(
-                    context: context,
-                    normalizedBox: textFeature.boundingBox,
-                    priority: priority,
-                    canvasSize: size
-                )
-            }
+            // Draw priority badge
+            drawPriorityBadge(
+                context: context,
+                normalizedBox: textResult.boundingBox,
+                priority: textResult.priority,
+                canvasSize: size
+            )
         }
 
         // Draw face bounding boxes and landmarks
-        for faceFeature in results.faceFeatures {
+        for faceResult in analyzedImage.faceResults {
             drawBoundingBox(
                 context: context,
-                normalizedBox: faceFeature.boundingBox,
+                normalizedBox: faceResult.boundingBox,
                 color: .green,
                 canvasSize: size
             )
 
             // Draw facial landmarks if present
-            if let landmarks = faceFeature.landmarks {
+            if let landmarks = faceResult.landmarks {
                 drawLandmarks(
                     context: context,
                     landmarks: landmarks,
-                    faceBoundingBox: faceFeature.boundingBox,
-                    canvasSize: size
-                )
-            }
-        }
-
-        // Draw barcode bounding boxes
-        for barcodeFeature in results.barcodeFeatures {
-            drawBoundingBox(
-                context: context,
-                normalizedBox: barcodeFeature.boundingBox,
-                color: .purple,
-                canvasSize: size
-            )
-        }
-
-        // Draw saliency bounding boxes
-        for saliencyFeature in results.saliencyFeatures {
-            for box in saliencyFeature.boundingBoxes {
-                drawBoundingBox(
-                    context: context,
-                    normalizedBox: box,
-                    color: .orange,
+                    faceBoundingBox: faceResult.boundingBox,
                     canvasSize: size
                 )
             }
@@ -136,7 +116,7 @@ struct ImageOverlayView: View {
 
     private func drawLandmarks(
         context: GraphicsContext,
-        landmarks: FaceLandmarkPoints,
+        landmarks: FacialLandmarks,
         faceBoundingBox: CGRect,
         canvasSize: CGSize
     ) {
