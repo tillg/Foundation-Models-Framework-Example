@@ -230,7 +230,6 @@ struct ImageOverlayView: View {
         // Convert normalized coordinates to canvas coordinates
         let x = normalizedBox.origin.x * canvasSize.width
         let width = normalizedBox.width * canvasSize.width
-        let height = normalizedBox.height * canvasSize.height
         let y = canvasSize.height - (normalizedBox.origin.y + normalizedBox.height) * canvasSize.height
 
         // Badge color based on priority (matching UI display)
@@ -243,22 +242,26 @@ struct ImageOverlayView: View {
             }
         }()
 
+        // Fixed badge size for legibility
+        let badgeWidth: CGFloat = 32
+        let badgeHeight: CGFloat = 24
+
         // Position badge at top-right corner of bounding box
-        let badgeSize: CGFloat = min(24, height * 0.4) // Adaptive size, but not too large
-        let badgeX = x + width - badgeSize - 4
+        // Allow it to extend beyond the box if needed
+        let badgeX = x + width - badgeWidth / 2
         let badgeY = y + 4
 
         // Draw badge background (rounded rectangle)
-        let badgeRect = CGRect(x: badgeX, y: badgeY, width: badgeSize, height: badgeSize * 0.8)
+        let badgeRect = CGRect(x: badgeX, y: badgeY, width: badgeWidth, height: badgeHeight)
         let badgePath = Path(roundedRect: badgeRect, cornerRadius: 4)
         context.fill(badgePath, with: .color(badgeColor))
 
         // Draw text
         let text = Text("P\(priority)")
-            .font(.system(size: badgeSize * 0.5, weight: .semibold))
+            .font(.system(size: 12, weight: .semibold))
             .foregroundColor(.white)
 
-        context.draw(text, at: CGPoint(x: badgeX + badgeSize / 2, y: badgeY + badgeSize * 0.4))
+        context.draw(text, at: CGPoint(x: badgeX + badgeWidth / 2, y: badgeY + badgeHeight / 2))
     }
 
 }

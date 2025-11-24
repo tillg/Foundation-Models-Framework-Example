@@ -1,161 +1,439 @@
-# Identify Font Size in Image Text
+# Image analysis as a service
 
-## Goal
-When analyzing text in images, measure the "importance" or prominence of different text elements to better understand the visual hierarchy and prioritize content.
+We built an image analysis lab with text recognigiton. Now I would like to wrap functionality do I can easily use it in another SwiftUI project.
 
-## Research: Apple Vision Framework Capabilities
+What our service / library should provide:
 
-### VNRecognizedText Properties
-The Vision framework's `VNRecognizeTextRequest` returns `VNRecognizedText` objects with:
-- `boundingBox`: Normalized coordinates (0-1) of text region
-- `topCandidates(_:)`: Array of `VNRecognizedTextObservation` with confidence scores
-- Character-level bounding boxes via `boundingBox(for:)` method
+* The API allows me to set an image
+* Then I can access the recognized texts including their confidence and Priority
+* I can get the image including the overlays data, so I can use it on macOS as well as iPhone / iPad
+* It should asynchronously with await, so it doesn't block the UI
+* It should use the most up-to-date Apple observation framework.
 
-**Key Finding**: Vision framework does NOT directly provide font size information. It provides spatial coordinates only.
+---
 
-### Available Metrics from Vision Framework
-1. **Bounding Box Dimensions**: Height and width in normalized coordinates
-2. **Character Bounding Boxes**: Individual character positions
-3. **Confidence Scores**: Recognition accuracy (not related to size)
-4. **Text Baseline**: Orientation and alignment information
+## Architecture: @Observable Service Class
 
-## Implementation Approaches
+### Overview
 
-### Approach 1: Height-Based Estimation (Recommended)
-Calculate apparent font size using bounding box height relative to image dimensions.
+We'll create a reusable `ImageAnalysisService` using the @Observable macro (iOS 17+) that wraps the existing Vision analysis functionality into a clean, easy-to-use API. This approach balances simplicity with reusability.
 
-```swift
-// Pseudo-code
-let imageHeight = image.size.height
-let textHeight = observation.boundingBox.height * imageHeight
+### Current Architecture Review
 
-// Approximate point size (72 points per inch, typical screen DPI ~144-220)
-let estimatedPointSize = textHeight * 0.75 // Heuristic conversion factor
+The existing Vision module has these key components that we'll reorganize:
+
+**Services Layer:**
+- `VisionAnalyzer.swift` - Core Vision framework wrapper (text, faces, objects, barcodes, saliency)
+- `FontSizeAnalyzer.swift` - Calculates text importance/priority based on size
+- `ImagePreprocessor.swift` - Image preparation and optimization
+
+**Models Layer:**
+- `ImageFeatures.swift` - Result containers (TextFeature, FaceFeature, ObjectFeature, etc.)
+- `PlatformImage.swift` - Cross-platform UIImage/NSImage abstraction
+
+**Views Layer:**
+- `ImageOverlayView.swift` - Canvas-based bounding box rendering (cross-platform)
+
+### New Structure
+
+```
+Foundation Lab/
+└── Services/
+    └── ImageAnalysis/
+        ├── ImageAnalysisService.swift (@Observable)
+        ├── Models/
+        │   ├── AnalyzedImage.swift
+        │   ├── TextRecognitionResult.swift
+        │   └── PlatformImage.swift (moved from Vision/Models)
+        ├── Internal/
+        │   ├── VisionAnalyzer.swift (refactored from Vision/Services)
+        │   ├── FontSizeAnalyzer.swift (moved from Vision/Services)
+        │   └── ImagePreprocessor.swift (moved from Vision/Services)
+        └── Views/
+            └── ImageOverlayView.swift (refactored from Vision/Views)
 ```
 
-**Pros**:
-- Simple and fast
-- Works for horizontal text
-- Good relative measure for importance ranking
+### Public API Design
 
-**Cons**:
-- Doesn't account for font families (different x-heights)
-- Less accurate for multi-line text blocks
-- Assumes standard aspect ratios
-
-### Approach 2: Character-Level Surface Area Calculation
-Calculate area per character for more accurate size estimation.
+#### 1. ImageAnalysisService (@Observable)
 
 ```swift
-// Pseudo-code
-let boundingBox = observation.boundingBox
-let textArea = boundingBox.width * boundingBox.height * imageArea
-let characterCount = observation.text.count
-let areaPerCharacter = textArea / Double(characterCount)
+import Foundation
+import Observation
 
-// Score based on area per character
-let importanceScore = sqrt(areaPerCharacter) // Normalizes to linear dimension
-```
+@Observable
+public final class ImageAnalysisService {
+    // Public state properties
+    public private(set) var analyzedImage: AnalyzedImage?
+    public private(set) var isAnalyzing = false
+    public private(set) var error: Error?
 
-**Pros**:
-- Accounts for text length
-- Better handles wide vs. tall text blocks
-- More robust for varying aspect ratios
+    public init() {}
 
-**Cons**:
-- More complex calculation
-- Doesn't distinguish between tight and loose kerning
-- Requires character count normalization
+    /// Analyzes an image and updates the analyzedImage property
+    public func analyze(image: PlatformImage) async {
+        // Analysis implementation
+    }
 
-### Approach 3: Hybrid Approach (Most Robust)
-Combine height and area-per-character with weighted scoring.
-
-```swift
-// Pseudo-code
-struct TextImportanceMetrics {
-    let heightScore: Double        // Normalized height (0-1)
-    let areaPerCharScore: Double   // Normalized area per character
-    let positionScore: Double      // Y-position weight (top = higher importance)
-
-    var combinedScore: Double {
-        (heightScore * 0.5) +
-        (areaPerCharScore * 0.3) +
-        (positionScore * 0.2)
+    /// Clears the current analysis results
+    public func clear() {
+        analyzedImage = nil
+        error = nil
     }
 }
 ```
 
-**Additional Factors**:
-- **Position**: Text at top of image often more important
-- **Contrast**: Could integrate with color analysis (not from Vision)
-- **Isolation**: Text surrounded by whitespace may be headers
-- **Line Count**: Single-line text often more important than paragraphs
-
-## Implementation Plan
-
-### Phase 1: Basic Height-Based Scoring
-1. Add `FontSizeAnalyzer` utility class
-2. Calculate normalized height for each `VNRecognizedText`
-3. Rank text elements by height
-4. Return sorted array with importance scores
-
-### Phase 2: Enhanced Area-Based Calculation
-1. Implement area-per-character calculation
-2. Add character-level bounding box analysis (if needed for accuracy)
-3. Compare height-only vs. area-based rankings
-
-### Phase 3: Contextual Importance Scoring
-1. Integrate position weighting (top vs. bottom)
-2. Consider text density (isolated vs. grouped)
-3. Add configurable scoring weights
-
-## Data Structure
+#### 2. AnalyzedImage (struct)
 
 ```swift
-struct TextElement {
-    let text: String
-    let confidence: Float
-    let boundingBox: CGRect
-
-    // Font size estimation
-    let estimatedPointSize: CGFloat
-    let heightInPixels: CGFloat
-    let areaPerCharacter: CGFloat
-
-    // Importance scoring
-    let importanceScore: Double
-    let rank: Int  // 1 = most important
+public struct AnalyzedImage {
+    public let originalImage: PlatformImage
+    public let textResults: [TextRecognitionResult]
+    public let faceResults: [FaceRecognitionResult]
+    public let objectResults: [ObjectRecognitionResult]
+    public let imageSize: CGSize
 }
 ```
 
-## Integration Points
+#### 3. TextRecognitionResult (struct)
 
-### Existing Vision Lab Code
-- Modify `VisionLabViewModel` to include importance analysis
-- Add scoring display in `ImageAnalysisDetailView`
-- Visualize text importance with color coding or size indicators
-- Sort analyzed text by importance in UI
+```swift
+public struct TextRecognitionResult: Identifiable {
+    public let id: UUID
+    public let text: String
+    public let confidence: Float  // 0.0-1.0
+    public let priority: Int      // 1 = highest importance
+    public let boundingBox: CGRect
+    public let estimatedPointSize: CGFloat?
 
-### Testing Strategy
-- Test with various image types: posters, documents, UI screenshots, signs
-- Validate against human judgment of text importance
-- Compare different scoring approaches
-- Handle edge cases: rotated text, vertical text, overlapping text
+    public var confidencePercent: Int {
+        Int(confidence * 100)
+    }
+}
+```
 
-## Open Questions
+#### 4. ImageOverlayView (SwiftUI View)
 
-1. Should we use device screen DPI for point size conversion or assume standard 72 DPI? 
-   * Whatever is simpler.
-2. How to handle non-Latin scripts (CJK characters have different proportions)?
-   * Don't bother, we treat all characters simply the same way.
-3. Should importance scoring be image-specific or normalized across multiple images?
-   * We only do a scoring / ordering within 1 image
-4. Do we want to expose raw metrics or just final importance ranking?
-   * Only the final ranking, i.e. priority. 1 being the highest. And there can be multiple texts with the same priority.
+```swift
+public struct ImageOverlayView: View {
+    let analyzedImage: AnalyzedImage
 
-## References
+    public init(analyzedImage: AnalyzedImage) {
+        self.analyzedImage = analyzedImage
+    }
 
-- [Vision Framework Documentation](https://developer.apple.com/documentation/vision)
-- `VNRecognizeTextRequest`: Text detection API
-- `VNRecognizedText`: Text observation with bounding boxes
-- Typography metrics: x-height, cap height, baseline
+    public var body: some View {
+        // Canvas-based overlay rendering
+    }
+}
+```
+
+### Usage Example
+
+```swift
+import SwiftUI
+
+struct ContentView: View {
+    @State private var selectedImage: UIImage?
+    @State private var service = ImageAnalysisService()
+
+    var body: some View {
+        VStack {
+            // Image picker
+            PhotosPicker(selection: $photoItem) {
+                Text("Select Image")
+            }
+
+            // Analysis results
+            if service.isAnalyzing {
+                ProgressView("Analyzing...")
+            } else if let analyzed = service.analyzedImage {
+                // Display image with overlays
+                ImageOverlayView(analyzedImage: analyzed)
+                    .frame(height: 300)
+
+                // Display text results
+                List(analyzed.textResults) { result in
+                    VStack(alignment: .leading) {
+                        Text(result.text)
+                            .font(.headline)
+                        HStack {
+                            Text("Priority: \(result.priority)")
+                            Text("Confidence: \(result.confidencePercent)%")
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+        .onChange(of: selectedImage) { _, newImage in
+            if let image = newImage {
+                Task {
+                    await service.analyze(image: image)
+                }
+            }
+        }
+    }
+}
+```
+
+### Key Design Decisions
+
+**1. @Observable for Reactive State**
+- Properties automatically observable without `@Published`
+- SwiftUI views update only when accessed properties change
+- More efficient than ObservableObject
+- Use `@State` instead of `@StateObject` in views
+
+**2. Async/Await for Analysis**
+- Single async method: `analyze(image:) async`
+- Updates service properties on completion
+- Error handling via error property
+- No completion handlers (modern Swift concurrency)
+
+**3. Value-Type Results**
+- `AnalyzedImage` is an immutable struct
+- Contains all analysis data
+- Nested result types (TextRecognitionResult, etc.)
+- Safe to pass between contexts
+
+**4. Cross-Platform Support**
+- `PlatformImage` typealias (UIImage on iOS, NSImage on macOS)
+- Conditional compilation in extensions
+- Canvas-based overlay rendering works on both platforms
+- Public API identical across iOS and macOS
+
+**5. Internal Implementation**
+- Reuse existing VisionAnalyzer, FontSizeAnalyzer
+- Keep as internal (not public)
+- Preprocessing handled internally
+- Clean separation of concerns
+
+### Apple Best Practices
+
+**@Observable macro (iOS 17+):**
+- Replaces `ObservableObject` with compile-time observation
+- No `@Published` needed - properties automatically tracked
+- More granular updates - only dependent views refresh
+- Reference: [Apple Documentation - Observable](/documentation/observation/observable)
+
+**Swift Concurrency:**
+- `async/await` for non-blocking operations
+- `@MainActor` isolation for UI updates
+- Structured concurrency with Task
+- SwiftUI `.task` modifier for lifecycle management
+
+---
+
+## How to Copy to Another Project
+
+### Step 1: Copy the ImageAnalysis Folder
+
+Copy the entire service module to your new project:
+
+**From Foundation Lab:**
+```
+Foundation Lab/Services/ImageAnalysis/
+```
+
+**To Your Project:**
+```
+YourProject/Services/ImageAnalysis/
+```
+
+Or place it at your preferred location:
+```
+YourProject/ImageAnalysis/
+```
+
+### Step 2: Add Files to Xcode Project
+
+1. Open your project in Xcode
+2. Right-click your project navigator
+3. Select "Add Files to YourProject..."
+4. Navigate to the copied `ImageAnalysis` folder
+5. Check "Copy items if needed"
+6. Select "Create groups"
+7. Add to your app target
+
+**Files to add:**
+- `ImageAnalysisService.swift`
+- `Models/AnalyzedImage.swift`
+- `Models/TextRecognitionResult.swift`
+- `Models/FaceRecognitionResult.swift`
+- `Models/ObjectRecognitionResult.swift`
+- `Models/PlatformImage.swift`
+- `Internal/VisionAnalyzer.swift`
+- `Internal/FontSizeAnalyzer.swift`
+- `Internal/ImagePreprocessor.swift`
+- `Views/ImageOverlayView.swift`
+
+### Step 3: Verify Framework Dependencies
+
+Ensure your project links these frameworks (should be automatic):
+- **Vision.framework** - Image analysis
+- **SwiftUI** - UI components
+- **CoreImage** - Image processing
+
+### Step 4: Set Minimum Deployment Target
+
+The service requires:
+- **iOS 17.0+** or **macOS 14.0+** (for @Observable macro)
+
+Update in Xcode:
+1. Select your project
+2. Go to "Build Settings"
+3. Set "iOS Deployment Target" to 17.0 (or macOS 14.0)
+
+### Step 5: Import and Use
+
+```swift
+// No import needed - part of your project
+import SwiftUI
+
+struct MyView: View {
+    @State private var service = ImageAnalysisService()
+
+    var body: some View {
+        // Use the service
+    }
+}
+```
+
+### Step 6: Customize (Optional)
+
+You can customize the service for your needs:
+
+**Modify overlay colors** in `ImageOverlayView.swift`:
+```swift
+// Line ~134
+context.stroke(path, with: .color(.blue), lineWidth: 3)  // Change color
+```
+
+**Adjust priority colors** in `ImageOverlayView.swift`:
+```swift
+// Lines 236-242
+let badgeColor: Color = {
+    switch priority {
+    case 1: return .red      // Highest priority
+    case 2: return .orange   // Medium priority
+    case 3: return .blue     // Lower priority
+    default: return .gray
+    }
+}()
+```
+
+**Filter analysis types** in `ImageAnalysisService.swift`:
+```swift
+// Only analyze text (skip faces, objects)
+let results = try await analyzer.analyze(
+    imagePath: preprocessedURL.path(),
+    analysisTypes: [.text],  // Add/remove types as needed
+    includeConfidence: true
+)
+```
+
+### Step 7: Test Integration
+
+Create a simple test view:
+
+```swift
+import SwiftUI
+import PhotosUI
+
+struct TestAnalysisView: View {
+    @State private var service = ImageAnalysisService()
+    @State private var photoItem: PhotosPickerItem?
+
+    var body: some View {
+        VStack {
+            PhotosPicker("Select Image", selection: $photoItem)
+
+            if service.isAnalyzing {
+                ProgressView()
+            }
+
+            if let analyzed = service.analyzedImage {
+                ImageOverlayView(analyzedImage: analyzed)
+                Text("Found \(analyzed.textResults.count) text items")
+            }
+
+            if let error = service.error {
+                Text("Error: \(error.localizedDescription)")
+                    .foregroundStyle(.red)
+            }
+        }
+        .onChange(of: photoItem) { _, newItem in
+            Task {
+                if let data = try? await newItem?.loadTransferable(type: Data.self),
+                   let image = UIImage(data: data) {
+                    await service.analyze(image: image)
+                }
+            }
+        }
+    }
+}
+```
+
+### Files Reference
+
+All files you need to copy are in:
+```
+Foundation Lab/Services/ImageAnalysis/
+```
+
+**Public API files** (main interface):
+- `ImageAnalysisService.swift` - Main service class
+- `Models/AnalyzedImage.swift` - Results container
+- `Models/TextRecognitionResult.swift` - Text analysis results
+- `Views/ImageOverlayView.swift` - Visualization component
+
+**Internal files** (implementation details):
+- `Internal/VisionAnalyzer.swift` - Vision framework wrapper
+- `Internal/FontSizeAnalyzer.swift` - Priority calculation
+- `Internal/ImagePreprocessor.swift` - Image preparation
+
+**Platform support**:
+- `Models/PlatformImage.swift` - iOS/macOS compatibility
+
+### Troubleshooting
+
+**Build Error: "Cannot find type 'PlatformImage'"**
+- Make sure `PlatformImage.swift` is included
+- Check it's added to your target
+
+**Runtime Error: "Image analysis failed"**
+- Verify Vision.framework is linked
+- Check image data is valid
+- Review console for specific Vision errors
+
+**UI Not Updating**
+- Ensure you're using `@State` (not `@StateObject`) with the service
+- Verify iOS 17+ / macOS 14+ deployment target
+- Check the service is marked `@Observable`
+
+---
+
+## Implementation Checklist
+
+- [ ] Create `Services/ImageAnalysis/` folder structure
+- [ ] Implement `ImageAnalysisService` with @Observable
+- [ ] Create `AnalyzedImage` and result models
+- [ ] Refactor `VisionAnalyzer` as internal service
+- [ ] Move/adapt `FontSizeAnalyzer` and `ImagePreprocessor`
+- [ ] Create public `ImageOverlayView`
+- [ ] Update `PlatformImage` for public use
+- [ ] Write example integration in app
+- [ ] Test on both iOS and macOS (if applicable)
+- [ ] Document public API with comments
+
+---
+
+## Next Steps
+
+Ready to implement? I can:
+1. Create the complete service implementation
+2. Refactor existing code into the new structure
+3. Build an example integration in the app
+4. Add unit tests for the service
