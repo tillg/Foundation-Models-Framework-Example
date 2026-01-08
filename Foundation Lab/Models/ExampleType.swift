@@ -10,6 +10,7 @@ import FoundationModels
 import SwiftUI
 
 enum ExampleType: String, CaseIterable, Identifiable {
+    case vision = "vision"
     case basicChat = "basic_chat"
     case businessIdeas = "business_ideas"
     case creativeWriting = "creative_writing"
@@ -19,7 +20,6 @@ enum ExampleType: String, CaseIterable, Identifiable {
     case generationGuides = "generation_guides"
     case generationOptions = "generation_options"
     case health = "health"
-    case vision = "vision"
 
     var id: String { rawValue }
 
