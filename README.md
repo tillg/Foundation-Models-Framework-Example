@@ -32,3 +32,5 @@ The app has four main sections provided by the project from which I forked:
 * Voice.
 * 
 My **Image Analysis** was added in the Examples Section at the very top.
+
+Try the App it in [TestFlight](https://testflight.apple.com/join/QZbeK21Y)
